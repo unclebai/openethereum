@@ -1,9 +1,9 @@
-## OpenEthereum v3.1RC1
+## OpenEthereum v3.1.0
 
-OpenEthereum 3.1rc1 is a candidate release based on v2.5.13 which is the last stable version known of the client that does not include any of the issues introduced in v2.7. 
+OpenEthereum 3.1.0 is a release based on v2.5.13 which is the last stable version known of the client that does not include any of the issues introduced in v2.7. 
 It removes non core features like Ethereum Classic, Private Transactions, Light Client, Updater, IPFS and Swarm support, currently deprecated flags such as expanse, kotti, mordor testnets.
 
-Database migration utility currently in beta: https://github.com/openethereum/3.1-db-upgrade-tool
+Database migration utility cam be found at: https://github.com/openethereum/3.1-db-upgrade-tool
 
 The full list of included changes from v2.5.13 to v3.1:
 
@@ -30,5 +30,4 @@ The full list of included changes from v2.5.13 to v3.1:
 - EIP-2315: Simple Subroutines for the EVM (#11629) 
 - Remove deprecated flags (removal of --geth flag)
 - Remove support for hardware wallets (#10678) 
-- Update bootnodes 
-
+- Update bootnodes
