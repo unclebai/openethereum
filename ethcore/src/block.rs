@@ -54,6 +54,7 @@ use types::{
     receipt::{Receipt, TransactionOutcome},
     transaction::{Error as TransactionError, SignedTransaction},
 };
+use engines::parlia::is_parlia;
 
 /// Block that is ready for transactions to be added.
 ///
@@ -259,6 +260,7 @@ impl<'x> OpenBlock<'x> {
             self.engine.machine(),
             &t,
             self.block.traces.is_enabled(),
+            is_parlia(self.engine.name()),
         )?;
 
         self.block
