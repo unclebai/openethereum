@@ -67,8 +67,6 @@ pub const SIGNING_DELAY_NOTURN_MS: u64 = 500;
 pub const SNAP_CACHE_NUM: usize = 512;
 /// Number of blocks after which to save the snapshot to the database
 pub const CHECKPOINT_INTERVAL: u64 = 1024;
-/// The bound divisor of the gas limit, used in update calculations.
-pub const GAS_LIMIT_BOUND_DIVISOR: usize = 256;
 /// Percentage to system reward.
 pub const SYSTEM_REWARD_PERCENT: usize = 4;
 
@@ -118,7 +116,10 @@ impl Parlia {
                         break;
                     }
                     if block_number % CHECKPOINT_INTERVAL == 0 {
-                        if let Some(new_snap) = Snapshot::load(Arc::clone(&self.db.read().as_ref().unwrap()), &block_hash) {
+                        if let Some(new_snap) = Snapshot::load(
+                            Arc::clone(&self.db.read().as_ref().unwrap()),
+                            &block_hash,
+                        ) {
                             snap = new_snap;
                             break;
                         }
@@ -137,11 +138,13 @@ impl Parlia {
                             }
                         }
                     }
+                    println!("{:?}", block_hash);
                     if let Some(header) = c.block_header(BlockId::Hash(block_hash)) {
                         headers.push(header.decode()?);
                         block_number -= 1;
                         block_hash = header.parent_hash();
                     } else {
+                        println!("{:?}", block_hash);
                         Err(EngineError::ParliaUnContinuousHeader)?
                     }
                 }
@@ -376,7 +379,17 @@ impl Engine<EthereumMachine> for Parlia {
                 found: *header.gas_limit(),
             }))?
         }
-        let snap = self.snapshot(num - 1, *header.parent_hash())?;
+        Ok(())
+    }
+
+    fn verify_block_family(&self, header: &Header, parent: &Header) -> Result<(), Error> {
+        let num = header.number();
+        let snap = self.snapshot(parent.number(), parent.hash())?;
+        if header.timestamp()
+            < parent.timestamp() + self.period + snap.back_off_time(header.author())
+        {
+            Err(EngineError::ParliaFutureBlock)?
+        }
         let signer = recover_creator(header, &self.chain_id)?;
         if signer != *header.author() {
             Err(EngineError::ParliaAuthorMismatch)?
@@ -403,31 +416,6 @@ impl Engine<EthereumMachine> for Parlia {
             Err(BlockError::InvalidDifficulty(Mismatch {
                 expected: DIFF_NOTURN,
                 found: *header.difficulty(),
-            }))?
-        }
-        Ok(())
-    }
-
-    fn verify_block_family(&self, header: &Header, parent: &Header) -> Result<(), Error> {
-        if *header.parent_hash() != parent.hash() {
-            Err(BlockError::UnknownParent(parent.hash()))?
-        }
-        let snap = self.snapshot(parent.number(), parent.hash())?;
-        if header.timestamp()
-            < parent.timestamp() + self.period + snap.back_off_time(header.author())
-        {
-            Err(EngineError::ParliaFutureBlock)?
-        }
-        let diff = match parent.gas_limit() > header.gas_limit() {
-            true => parent.gas_limit() - header.gas_limit(),
-            false => header.gas_limit() - parent.gas_limit(),
-        };
-        let limit = parent.gas_limit() / GAS_LIMIT_BOUND_DIVISOR;
-        if diff > limit {
-            Err(BlockError::InvalidGasLimit(OutOfBounds {
-                min: Some(parent.gas_limit() - limit),
-                max: Some(parent.gas_limit() + limit),
-                found: *header.gas_limit(),
             }))?
         }
         Ok(())

@@ -17,11 +17,11 @@
 //! Transaction Execution environment.
 use bytes::{Bytes, BytesRef};
 use crossbeam_utils::thread;
+use engines;
+use engines::parlia::util;
 use ethereum_types::{Address, H256, U256, U512};
 use evm::{CallType, FinalizationResult, Finalize};
 use executed::ExecutionError;
-use engines;
-use engines::parlia::util;
 pub use executed::{Executed, ExecutionResult};
 use externalities::*;
 use factory::VmFactory;
@@ -1171,12 +1171,14 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         }
 
         // validate if transaction fits into given block
-        if self.info.gas_used + t.gas > self.info.gas_limit {
-            return Err(ExecutionError::BlockGasLimitReached {
-                gas_limit: self.info.gas_limit,
-                gas_used: self.info.gas_used,
-                gas: t.gas,
-            });
+        if !parlia_engine || !util::is_system_transaction(t, &self.info.author) {
+            if self.info.gas_used + t.gas > self.info.gas_limit {
+                return Err(ExecutionError::BlockGasLimitReached {
+                    gas_limit: self.info.gas_limit,
+                    gas_used: self.info.gas_used,
+                    gas: t.gas,
+                });
+            }
         }
 
         // TODO: we might need bigints here, or at least check overflows.
@@ -1199,14 +1201,17 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         if !schedule.keep_unsigned_nonce || !t.is_unsigned() {
             self.state.inc_nonce(&sender)?;
         }
-        if parlia_engine && util::is_system_transaction(t, &self.info.author){
+        if parlia_engine && util::is_system_transaction(t, &self.info.author) {
             let system_balance = self.state.balance(&engines::SYSTEM_ACCOUNT)?;
-            if !system_balance.is_zero(){
-                self.state.transfer_balance(
-                    &engines::SYSTEM_ACCOUNT,
-                    &self.info.author,
-                    &system_balance,
-                    substate.to_cleanup_mode(&schedule)).unwrap();
+            if !system_balance.is_zero() {
+                self.state
+                    .transfer_balance(
+                        &engines::SYSTEM_ACCOUNT,
+                        &self.info.author,
+                        &system_balance,
+                        substate.to_cleanup_mode(&schedule),
+                    )
+                    .unwrap();
             }
         }
         self.state.sub_balance(
@@ -1574,9 +1579,9 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             fees_value,
             &self.info.author
         );
-        let reward_receiver =  if parlia_engine{
+        let reward_receiver = if parlia_engine {
             &engines::SYSTEM_ACCOUNT
-        }else{
+        } else {
             &self.info.author
         };
         self.state.add_balance(
@@ -2580,7 +2585,7 @@ mod tests {
         let executed = {
             let mut ex = Executive::new(&mut state, &info, &machine, &schedule);
             let opts = TransactOptions::with_no_tracing();
-            ex.transact(&t, opts,false).unwrap()
+            ex.transact(&t, opts, false).unwrap()
         };
 
         assert_eq!(executed.gas, U256::from(100_000));
@@ -2624,7 +2629,7 @@ mod tests {
         let res = {
             let mut ex = Executive::new(&mut state, &info, &machine, &schedule);
             let opts = TransactOptions::with_no_tracing();
-            ex.transact(&t, opts,false)
+            ex.transact(&t, opts, false)
         };
 
         match res {
@@ -2664,7 +2669,7 @@ mod tests {
         let res = {
             let mut ex = Executive::new(&mut state, &info, &machine, &schedule);
             let opts = TransactOptions::with_no_tracing();
-            ex.transact(&t, opts,false)
+            ex.transact(&t, opts, false)
         };
 
         match res {
@@ -2708,7 +2713,7 @@ mod tests {
         let res = {
             let mut ex = Executive::new(&mut state, &info, &machine, &schedule);
             let opts = TransactOptions::with_no_tracing();
-            ex.transact(&t, opts,false)
+            ex.transact(&t, opts, false)
         };
 
         match res {

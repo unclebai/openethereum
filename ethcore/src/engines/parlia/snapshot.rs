@@ -137,7 +137,7 @@ impl Snapshot {
         let mut ite = self.validators.iter();
         let mut res = ite.next().unwrap();
         if index > 0 {
-            for _ in 0..index - 1 {
+            for _ in 0..index {
                 res = ite.next().unwrap();
             }
         }
