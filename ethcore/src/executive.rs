@@ -1556,7 +1556,10 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             Ok(FinalizationResult { gas_left, .. }) => gas_left,
             _ => 0.into(),
         };
-        let refunded = cmp::min(refunds_bound, (t.gas - gas_left_prerefund) >> 1);
+        let mut refunded = cmp::min(refunds_bound, (t.gas - gas_left_prerefund) >> 1);
+        if parlia_engine && is_system_transaction(&t, &self.info.author) {
+            refunded = 0.into();
+        }
         let gas_left = gas_left_prerefund + refunded;
 
         let gas_used = t.gas.saturating_sub(gas_left);
